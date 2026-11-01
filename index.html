@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0E1318">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>불량 촬영 가이드</title>
+<style>
+  :root {
+    color-scheme: light;
+    --guide: #FFC233;
+    --scrim: rgba(10, 14, 19, 0.62);
+    --on-scrim: #F4F6F8;
+    --field-bg: rgba(255,255,255,.14);
+    --field-line: rgba(255,255,255,.35);
+    --sheet-bg: #F3F5F6;
+    --sheet-text: #1B232B;
+    --sheet-sub: #5A6672;
+    --sheet-field: #FFFFFF;
+    --sheet-line: #C9D1D8;
+    --btn-bg: #E2E7EB;
+    --btn-text: #1B232B;
+    --danger: #C0392B;
+    --ok: #1E8E5A;
+    --primary-bg: #FFC233;
+    --primary-text: #1B1A12;
+    --focus: #2F7DD1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --sheet-bg: #182027;
+      --sheet-text: #E8ECEF;
+      --sheet-sub: #9AA6B1;
+      --sheet-field: #222C35;
+      --sheet-line: #3A4651;
+      --btn-bg: #26313B;
+      --btn-text: #E8ECEF;
+      --danger: #FF7A6B;
+      --ok: #4CD08F;
+      --focus: #6FB0F5;
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; overscroll-behavior: none; }
+  body {
+    font-family: -apple-system, "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+    color: var(--on-scrim);
+  }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+
+  #cam, #guide, #stage { position: fixed; inset: 0; width: 100%; height: 100%; }
+  #cam { object-fit: cover; background: #000; }
+  #guide { pointer-events: none; }
+  #stage { z-index: 1; }
+
+  /* ===== 상단 ===== */
+  .top {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 5;
+    padding: calc(env(safe-area-inset-top) + 10px) 12px 12px;
+    background: linear-gradient(var(--scrim) 75%, rgba(10,14,19,0));
+  }
+  .selects { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .field { position: relative; display: block; }
+  .field small { display: block; font-size: 12px; opacity: .75; margin: 0 0 4px 2px; }
+  .field.sel::after {
+    content: ""; position: absolute; right: 13px; bottom: 19px;
+    width: 7px; height: 7px; border-right: 2px solid var(--on-scrim); border-bottom: 2px solid var(--on-scrim);
+    transform: rotate(45deg); pointer-events: none;
+  }
+  .top select, .top input {
+    width: 100%; font: inherit; font-size: 16px; font-weight: 700; color: var(--on-scrim);
+    background: var(--field-bg); border: 1.5px solid var(--field-line); border-radius: 10px;
+    min-height: 46px; padding: 0 12px;
+  }
+  .top select { appearance: none; -webkit-appearance: none; padding-right: 32px; text-overflow: ellipsis; }
+  .top select option { color: #1B232B; }
+  .top input { font-weight: 600; }
+  .top input::placeholder { color: rgba(244,246,248,.55); font-weight: 400; }
+  .lotrow { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 8px; }
+  .gear {
+    min-width: 46px; min-height: 46px; padding: 0 12px; border-radius: 10px; cursor: pointer;
+    font: inherit; font-size: 14px; font-weight: 700; color: var(--on-scrim);
+    background: var(--field-bg); border: 1.5px solid var(--field-line);
+  }
+
+  .tip {
+    margin-top: 10px; width: 100%; text-align: left; font: inherit; color: var(--on-scrim);
+    background: rgba(255,194,51,.16); border: 0; border-left: 4px solid var(--guide);
+    border-radius: 0 10px 10px 0; padding: 10px 12px; cursor: pointer;
+  }
+  .tip strong { display: block; font-size: 15px; line-height: 1.45; }
+  .tip span { display: block; font-size: 13px; line-height: 1.5; margin-top: 4px; opacity: .85; }
+  .tip.collapsed span { display: none; }
+
+  /* ===== 하단 ===== */
+  .controls {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+    padding: 24px 14px calc(env(safe-area-inset-bottom) + 18px);
+    background: linear-gradient(rgba(10,14,19,0), var(--scrim) 30%);
+    display: grid; grid-template-columns: 60px 1fr 60px; gap: 12px; align-items: center;
+  }
+  .status {
+    grid-column: 1 / -1; justify-self: center; max-width: 100%;
+    font: inherit; font-size: 14px; font-weight: 600; color: var(--on-scrim);
+    background: rgba(20,26,32,.75); border: 1.5px solid var(--field-line);
+    border-radius: 18px; padding: 7px 14px; cursor: pointer;
+  }
+  .status.ok { border-color: #4CD08F; }
+  .status.busy { border-color: var(--guide); }
+  .status.bad { border-color: #FF7A6B; background: rgba(120,30,25,.8); }
+  .capture {
+    font: inherit; font-size: 19px; font-weight: 800; color: var(--primary-text);
+    background: var(--primary-bg); border: 0; border-radius: 34px;
+    min-height: 68px; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.35);
+    transition: transform .08s;
+  }
+  .capture:active { transform: scale(.96); }
+  .capture:disabled { opacity: .4; }
+  .thumb {
+    position: relative; width: 60px; height: 60px; border-radius: 10px; padding: 0;
+    border: 2px solid rgba(255,255,255,.85); background: rgba(255,255,255,.1) center/cover;
+    cursor: pointer; visibility: hidden;
+  }
+  .thumb.show { visibility: visible; }
+  .thumb b {
+    position: absolute; top: -8px; right: -8px; min-width: 22px; height: 22px; padding: 0 6px;
+    border-radius: 11px; background: var(--guide); color: #1B1A12; font-size: 12px; line-height: 22px;
+  }
+  .torch {
+    width: 60px; height: 60px; border-radius: 50%; font-size: 24px; cursor: pointer;
+    background: var(--field-bg); border: 1.5px solid var(--field-line); visibility: hidden;
+  }
+  .torch.show { visibility: visible; }
+  .torch[aria-pressed="true"] { background: var(--guide); }
+
+  /* 촬영 단계 표시 */
+  .stepbar { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; }
+  .steps { display: flex; gap: 6px; margin: 0; padding: 0; list-style: none; flex: 1; }
+  .steps li {
+    flex: 1; text-align: center; font-size: 15px; font-weight: 800; padding: 9px 6px; border-radius: 10px;
+    background: rgba(20,26,32,.7); border: 1.5px solid var(--field-line); color: rgba(244,246,248,.7);
+  }
+  .steps li.current { background: var(--guide); border-color: var(--guide); color: #1B1A12; }
+  .steps li.done { border-color: #4CD08F; color: #CFF5E1; }
+  .steps li.done::before { content: "✓ "; }
+  .mini {
+    font: inherit; font-size: 14px; font-weight: 700; color: var(--on-scrim); white-space: nowrap;
+    background: rgba(20,26,32,.7); border: 1.5px solid var(--field-line); border-radius: 10px;
+    min-height: 42px; padding: 0 12px; cursor: pointer;
+  }
+  .finish {
+    grid-column: 1 / -1; font: inherit; font-size: 16px; font-weight: 800; min-height: 52px;
+    color: #fff; background: #1E8E5A; border: 0; border-radius: 14px; cursor: pointer;
+  }
+  .top select:disabled, .top input:disabled { opacity: .5; pointer-events: none; }
+
+  .flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 8; }
+  .flash.go { animation: flash .35s ease-out; }
+  @keyframes flash { from { opacity: .8; } to { opacity: 0; } }
+
+  #msg {
+    position: fixed; left: 20px; right: 20px; top: 50%; transform: translateY(-50%); z-index: 6;
+    background: rgba(20,26,32,.94); border-radius: 14px; padding: 20px;
+    font-size: 15px; line-height: 1.65; display: none;
+  }
+  #msg h3 { margin: 0 0 8px; font-size: 17px; color: var(--guide); }
+  #msg code { background: rgba(255,255,255,.12); padding: 1px 6px; border-radius: 4px; word-break: break-all; }
+  #msg button {
+    margin-top: 14px; width: 100%; min-height: 48px; font: inherit; font-weight: 700;
+    border: 0; border-radius: 10px; background: var(--guide); color: #1B1A12;
+  }
+
+  /* ===== 시트 공통 ===== */
+  .sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; max-height: 92vh; overflow-y: auto;
+    background: var(--sheet-bg); color: var(--sheet-text);
+    border-radius: 18px 18px 0 0; padding: 16px 16px calc(env(safe-area-inset-bottom) + 16px);
+    transform: translateY(105%); transition: transform .28s cubic-bezier(.2,.8,.2,1);
+    box-shadow: 0 -8px 30px rgba(0,0,0,.4);
+  }
+  .sheet.open { transform: translateY(0); }
+  .sheet h2 { margin: 0 0 10px; font-size: 18px; }
+  .sheet .sub { margin: -4px 0 12px; font-size: 14px; color: var(--sheet-sub); line-height: 1.5; }
+  .btn { font: inherit; font-size: 16px; font-weight: 700; min-height: 52px; border: 0; border-radius: 12px;
+         background: var(--btn-bg); color: var(--btn-text); cursor: pointer; padding: 0 12px; }
+  .btn.del { color: var(--danger); }
+  .btn.primary { background: var(--primary-bg); color: var(--primary-text); }
+  .row { display: grid; grid-template-columns: 1fr 1fr 1.6fr; gap: 8px; }
+
+  /* 사진 시트 */
+  .strip { display: flex; gap: 8px; overflow-x: auto; padding: 8px 0 10px; }
+  .strip button {
+    position: relative; flex: 0 0 58px; height: 58px; border-radius: 8px; padding: 0; cursor: pointer;
+    border: 3px solid transparent; background: #000 center/cover;
+  }
+  .strip button[aria-current="true"] { border-color: var(--guide); }
+  .strip i {
+    position: absolute; right: -6px; top: -6px; font-style: normal; font-size: 12px;
+    width: 20px; height: 20px; line-height: 20px; border-radius: 50%; background: var(--sheet-bg);
+  }
+  .strip em {
+    position: absolute; left: 0; right: 0; bottom: 0; font-style: normal; font-size: 11px; font-weight: 700;
+    color: #fff; background: rgba(0,0,0,.6); border-radius: 0 0 5px 5px; line-height: 16px;
+  }
+  .sheet img { display: block; width: 100%; max-height: 44vh; object-fit: contain; background: #000; border-radius: 10px; }
+  .fname { margin: 8px 0 2px; font-size: 13px; color: var(--sheet-sub); word-break: break-all; }
+  .shotstate { margin: 0 0 12px; font-size: 14px; font-weight: 600; }
+
+  /* 설정 시트 */
+  .sfield { display: block; margin-bottom: 14px; font-size: 14px; font-weight: 600; color: var(--sheet-sub); }
+  .sfield input {
+    display: block; width: 100%; margin-top: 6px; min-height: 48px; padding: 0 12px;
+    font: inherit; font-size: 16px; font-weight: 600; color: var(--sheet-text);
+    background: var(--sheet-field); border: 1.5px solid var(--sheet-line); border-radius: 10px;
+  }
+  fieldset { border: 0; padding: 0; margin: 0 0 14px; }
+  legend { font-size: 14px; font-weight: 600; color: var(--sheet-sub); margin-bottom: 6px; padding: 0; }
+  .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .seg label { position: relative; }
+  .seg input { position: absolute; opacity: 0; inset: 0; }
+  .seg span {
+    display: flex; align-items: center; justify-content: center; min-height: 48px; text-align: center;
+    border-radius: 10px; background: var(--btn-bg); font-size: 15px; font-weight: 700; cursor: pointer;
+    border: 2px solid transparent;
+  }
+  .seg input:checked + span { border-color: #D99A00; background: rgba(255,194,51,.25); }
+  .seg input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .nasbox { border: 1.5px solid var(--sheet-line); border-radius: 12px; padding: 12px 12px 4px; margin-bottom: 14px; }
+  .testrow { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .testrow p { margin: 0; font-size: 14px; line-height: 1.4; }
+  .testrow p.ok { color: var(--ok); }
+  .testrow p.bad { color: var(--danger); }
+  .opts { display: flex; flex-direction: column; gap: 2px; margin: 0 0 14px; font-size: 15px; }
+  .opts label { display: flex; align-items: center; gap: 10px; min-height: 40px; }
+  .opts input { width: 20px; height: 20px; accent-color: #D99A00; }
+  .wide { width: 100%; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 150px); z-index: 12;
+    transform: translate(-50%, 20px); opacity: 0; max-width: 90vw;
+    background: rgba(20,26,32,.94); color: #fff; font-size: 14px; text-align: center; line-height: 1.45;
+    padding: 10px 16px; border-radius: 18px; transition: all .25s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sheet, .toast, .capture { transition: none; }
+    .flash.go { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<video id="cam" autoplay playsinline muted></video>
+<canvas id="guide"></canvas>
+<div id="stage" aria-hidden="true"></div>
+
+<header class="top" id="top">
+  <div class="selects">
+    <label class="field sel"><small>부품 모델</small><select id="model"></select></label>
+    <label class="field sel"><small>불량 유형</small><select id="defect"></select></label>
+  </div>
+  <div class="lotrow">
+    <input type="text" id="lot" placeholder="LOT / 시리얼 번호 (선택)" autocomplete="off" autocapitalize="characters" enterkeyhint="done" aria-label="LOT 또는 시리얼 번호">
+    <button class="gear" id="openSettings" aria-label="설정">⚙ <span id="workerChip"></span></button>
+  </div>
+  <button class="tip" id="tip" aria-expanded="true"><strong id="tipMain"></strong><span id="tipSub"></span></button>
+</header>
+
+<div id="msg" role="alert"></div>
+
+<footer class="controls" id="controls">
+  <div class="stepbar">
+    <ol class="steps" aria-label="촬영 단계">
+      <li id="st1">1 전체샷</li>
+      <li id="st2">2 근접샷</li>
+    </ol>
+    <button class="mini" id="retake" hidden>↺ 다시 찍기</button>
+  </div>
+  <button class="status" id="status" hidden></button>
+  <button class="thumb" id="thumb" aria-label="촬영한 사진 보기"><b id="count">0</b></button>
+  <button class="capture" id="capture" disabled>📸 사진 촬영 (Capture)</button>
+  <button class="torch" id="torch" aria-pressed="false" aria-label="플래시 켜기">🔦</button>
+  <button class="finish" id="finish" hidden>✓ 세트 완료, 다음 불량 촬영</button>
+</footer>
+
+<div class="flash" id="flash"></div>
+
+<!-- 사진 확인 시트 -->
+<section class="sheet" id="sheet" aria-label="촬영 사진">
+  <h2>이번 작업 사진</h2>
+  <div class="strip" id="strip"></div>
+  <img id="preview" alt="선택한 촬영 사진">
+  <p class="fname" id="fname"></p>
+  <p class="shotstate" id="shotstate"></p>
+  <div class="row">
+    <button class="btn del" id="del">삭제</button>
+    <button class="btn" id="close">닫기</button>
+    <button class="btn primary" id="savePhone">폰에 저장</button>
+  </div>
+</section>
+
+<!-- 설정 시트 -->
+<section class="sheet" id="settings" aria-label="설정">
+  <h2>설정</h2>
+  <p class="sub" id="firstRun" hidden>처음 한 번만 입력하면 이 폰에서 계속 유지됩니다.</p>
+
+  <label class="sfield">작업자 이름
+    <input type="text" id="sWorker" placeholder="예: 홍길동" autocomplete="name">
+  </label>
+
+  <fieldset>
+    <legend>사진 보관 방식</legend>
+    <div class="seg">
+      <label><input type="radio" name="mode" value="phone"><span>폰에 저장</span></label>
+      <label><input type="radio" name="mode" value="nas"><span>NAS 전송</span></label>
+      <label><input type="radio" name="mode" value="both"><span>둘 다</span></label>
+    </div>
+  </fieldset>
+
+  <div class="nasbox" id="nasBox">
+    <label class="sfield">NAS 업로드 주소
+      <input type="text" id="sUrl" inputmode="url" autocapitalize="off" autocomplete="off" placeholder="upload.php">
+    </label>
+    <label class="sfield">접속 토큰 (IT 담당자에게 받은 값)
+      <input type="text" id="sToken" autocapitalize="off" autocomplete="off">
+    </label>
+    <div class="testrow">
+      <button class="btn" id="sTest">연결 테스트</button>
+      <p id="sTestResult"></p>
+    </div>
+  </div>
+
+  <div class="opts">
+    <label><input type="checkbox" id="sStamp"> 사진에 정보 표기 (모델, 불량, 작업자, 시간)</label>
+    <label><input type="checkbox" id="sGuide"> 사진에 가이드 선 포함</label>
+  </div>
+  <button class="btn primary wide" id="sDone">완료</button>
+</section>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* ================= 현장 설정 (필요 시 수정) ================= */
+const MODELS = {
+  SHA: { label: '샤워 헤드 A타입', code: '샤워헤드A' },
+  CHB: { label: '챔버 부품 B타입', code: '챔버B' }
+};
+const DEFECTS = {
+  scratch: {
+    label: '① 미세 스크래치/찍힘', code: '스크래치',
+    tip: '💡 스크래치 검사 시: 측면 집게 조명을 30도 사선으로 비춰서 촬영하세요!',
+    sub: '결함을 사각형 중앙에 두고 10cm 이내로 접근하세요. 천장 조명 반사가 사각형 안에 들어오지 않게 각도를 조정합니다.'
+  },
+  particle: {
+    label: '② 홀 이물/파티클', code: '홀이물',
+    tip: '💡 홀 이물 검사 시: 홀 정면에서 수직으로 촬영하고, 이물이 있는 격자 칸을 눌러 위치를 표시하세요.',
+    sub: '기준 홀(마킹 쪽)을 항상 A1 칸에 맞추면 위치 기록이 작업자마다 일정해집니다.'
+  },
+  coating: {
+    label: '③ 코팅 변색/얼룩', code: '코팅변색',
+    tip: '💡 코팅 변색 검사 시: 20~30cm 거리에서 원 안에 전체 면이 들어오게 촬영하세요.',
+    sub: '그림자 없는 확산광 아래에서 찍고, 비교를 위해 정상 부위가 함께 보이도록 담으세요.'
+  }
+};
+const GRID_N = 5;
+// 1단계 전체샷 안내
+const OVERALL_TIP = {
+  tip: '💡 1단계 전체샷: 부품 전체와 LOT 라벨이 한 화면에 들어오게 찍으세요.',
+  sub: '불량 위치를 화살표 스티커나 지시봉으로 가리키면 근접샷과 연결이 명확해집니다.'
+};
+// 2단계 근접샷 공통 안내 (불량 유형별 안내 뒤에 붙음)
+const CLOSE_EXTRA = ' 크기 판정을 위해 소형 자나 스케일 스티커를 불량 옆에 두세요.';
+// IT 담당자가 미리 채워 두면 작업자는 이름만 입력하면 됩니다.
+const DEFAULTS = {
+  worker: '', mode: 'both', url: 'upload.php', token: '',
+  stamp: true, guide: false, model: 'SHA', defect: 'scratch'
+};
+
+/* ================= 공통 ================= */
+const $ = id => document.getElementById(id);
+const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const pad = n => String(n).padStart(2, '0');
+const ymd = d => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+const hms = d => `${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+const fmt = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+
+function toast(text, ms = 2200) {
+  const t = $('toast');
+  t.textContent = text;
+  t.classList.add('show');
+  clearTimeout(toast.t);
+  toast.t = setTimeout(() => t.classList.remove('show'), ms);
+}
+
+/* ================= 설정 저장 (이 폰에 유지) ================= */
+const SKEY = 'defectcam.settings.v1';
+let settings = { ...DEFAULTS };
+try { Object.assign(settings, JSON.parse(localStorage.getItem(SKEY) || '{}')); } catch (e) {}
+function persist() { try { localStorage.setItem(SKEY, JSON.stringify(settings)); } catch (e) {} }
+const wantsNas = () => settings.mode === 'nas' || settings.mode === 'both';
+const wantsPhone = () => settings.mode === 'phone' || settings.mode === 'both';
+
+/* ================= NAS 전송 대기열 (IndexedDB, 앱을 닫아도 유지) ================= */
+const Q = {
+  db: null, mem: [],
+  async open() {
+    if (this.db !== null) return this.db;
+    try {
+      this.db = await new Promise((res, rej) => {
+        const r = indexedDB.open('defectcam', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('queue', { keyPath: 'id' });
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+      });
+    } catch (e) { this.db = false; }  // 사용 불가 시 메모리 대기열로 대체
+    return this.db;
+  },
+  async run(mode, fn) {
+    const db = await this.open();
+    if (!db) return null;
+    return new Promise((res, rej) => {
+      const t = db.transaction('queue', mode);
+      const req = fn(t.objectStore('queue'));
+      t.oncomplete = () => res(req ? req.result : null);
+      t.onerror = () => rej(t.error);
+    });
+  },
+  async put(item) { if (!(await this.open())) { this.mem.push(item); return; } await this.run('readwrite', s => s.put(item)); },
+  async del(id) { if (!(await this.open())) { this.mem = this.mem.filter(i => i.id !== id); return; } await this.run('readwrite', s => s.delete(id)); },
+  async all() { if (!(await this.open())) return [...this.mem]; return (await this.run('readonly', s => s.getAll())) || []; },
+  async count() { if (!(await this.open())) return this.mem.length; return (await this.run('readonly', s => s.count())) || 0; }
+};
+
+let uploading = false, lastError = '', sentCount = 0;
+const cancelled = new Set();
+
+async function uploadOne(item) {
+  const fd = new FormData();
+  fd.append('photo', item.blob, item.name);
+  fd.append('token', settings.token);
+  for (const [k, v] of Object.entries(item.meta)) fd.append(k, v);
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 30000);
+  let res;
+  try {
+    res = await fetch(settings.url, { method: 'POST', body: fd, signal: ctrl.signal, cache: 'no-store' });
+  } catch (e) {
+    throw new Error(e.name === 'AbortError' ? '응답 시간 초과' : 'NAS에 연결할 수 없음 (와이파이 확인)');
+  } finally { clearTimeout(timer); }
+  let data = {};
+  try { data = await res.json(); } catch (e) {}
+  if (!res.ok || !data.ok) throw new Error(data.error || `서버 오류 (${res.status})`);
+  return data;
+}
+
+async function pump() {
+  if (uploading || !wantsNas()) return;
+  uploading = true;
+  updateStatus();
+  try {
+    const items = (await Q.all()).sort((a, b) => a.id - b.id);
+    for (const it of items) {
+      if (cancelled.has(it.id)) continue;
+      setShotNas(it.id, 'sending');
+      try {
+        await uploadOne(it);
+        await Q.del(it.id);
+        setShotNas(it.id, 'sent');
+        sentCount++;
+        lastError = '';
+      } catch (e) {
+        setShotNas(it.id, 'fail');
+        lastError = e.message;
+        break;   // 연결 문제면 나머지도 실패하므로 다음 재시도까지 대기
+      }
+    }
+  } finally {
+    uploading = false;
+    updateStatus();
+  }
+}
+setInterval(pump, 20000);
+window.addEventListener('online', pump);
+
+async function updateStatus() {
+  const el = $('status');
+  if (!wantsNas()) { el.hidden = true; return; }
+  const n = await Q.count();
+  let txt, cls;
+  if (n === 0) {
+    cls = 'ok';
+    txt = sentCount ? `✓ NAS 전송 완료 (이번 작업 ${sentCount}장)` : '촬영하면 NAS로 자동 전송됩니다';
+  } else if (lastError && !uploading) {
+    cls = 'bad';
+    txt = `⚠ NAS 전송 안 됨, ${n}장 폰에 보관 중 (눌러서 재시도)`;
+  } else {
+    cls = 'busy';
+    txt = `⏳ NAS 전송 중 (${n}장 남음)`;
+  }
+  el.className = 'status ' + cls;
+  el.textContent = txt;
+  el.hidden = false;
+}
+
+/* ================= 가이드 오버레이 ================= */
+const video = $('cam'), guide = $('guide'), gctx = guide.getContext('2d');
+const state = { model: settings.model, defect: settings.defect, cell: null };
+// 촬영 세트: 1장째 = 전체샷, 2장째부터 = 근접샷
+const set = { shots: [], time: null, lot: '', replace: {} };
+const isOverallStep = () => set.shots.length === 0;
+if (!MODELS[state.model]) state.model = Object.keys(MODELS)[0];
+if (!DEFECTS[state.defect]) state.defect = 'scratch';
+
+function insets() {
+  return {
+    top: $('top').getBoundingClientRect().bottom + 8,
+    bottom: window.innerHeight - $('controls').getBoundingClientRect().top + 4,
+    side: 18
+  };
+}
+function geom(W, H, s, ins) {
+  const aw = W - ins.side * 2 * s, ah = H - (ins.top + ins.bottom) * s;
+  return { cx: W / 2, cy: ins.top * s + ah / 2, m: Math.max(40 * s, Math.min(aw, ah)) };
+}
+function gridGeom(g) {
+  const side = g.m * 0.84;
+  return { side, cs: side / GRID_N, x0: g.cx - side / 2, y0: g.cy - side / 2 };
+}
+function dimOutside(ctx, W, H, shape) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, W, H);
+  shape(ctx);
+  ctx.fillStyle = 'rgba(8,12,18,0.40)';
+  ctx.fill('evenodd');
+  ctx.restore();
+}
+function label(ctx, text, x, y, s) {
+  if (!text) return;
+  ctx.save();
+  ctx.font = `700 ${13 * s}px -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0,0,0,.85)';
+  ctx.shadowBlur = 4 * s;
+  ctx.fillStyle = '#FFC233';
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+function drawGuide(ctx, W, H, s, ins, defect, cell, onScreen) {
+  const g = geom(W, H, s, ins);
+  const { cx, cy } = g;
+  ctx.save();
+  ctx.strokeStyle = '#FFC233';
+  ctx.lineCap = 'round';
+  ctx.shadowColor = 'rgba(0,0,0,.6)';
+  ctx.shadowBlur = 3 * s;
+
+  if (defect === 'overall') {
+    const aw = W - ins.side * 2 * s, ah = H - (ins.top + ins.bottom) * s;
+    const w = aw * 0.94, h = ah * 0.9, x0 = cx - w / 2, y0 = cy - h / 2;
+    dimOutside(ctx, W, H, c => c.rect(x0, y0, w, h));
+    ctx.lineWidth = 1.5 * s;
+    ctx.setLineDash([8 * s, 6 * s]);
+    ctx.strokeRect(x0, y0, w, h);
+    ctx.setLineDash([]);
+    const L = Math.min(w, h) * 0.12;
+    ctx.lineWidth = 4 * s;
+    ctx.beginPath();
+    [[x0, y0, 1, 1], [x0 + w, y0, -1, 1], [x0, y0 + h, 1, -1], [x0 + w, y0 + h, -1, -1]].forEach(([px, py, dx, dy]) => {
+      ctx.moveTo(px, py + L * dy); ctx.lineTo(px, py); ctx.lineTo(px + L * dx, py);
+    });
+    const c = 12 * s;
+    ctx.moveTo(cx - c, cy); ctx.lineTo(cx + c, cy);
+    ctx.moveTo(cx, cy - c); ctx.lineTo(cx, cy + c);
+    ctx.stroke();
+    label(ctx, '부품 전체 + LOT 라벨이 테두리 안에', cx, y0 + h - 16 * s, s);
+  }
+
+  if (defect === 'scratch') {
+    const side = g.m * 0.42, x0 = cx - side / 2, y0 = cy - side / 2;
+    dimOutside(ctx, W, H, c => c.rect(x0, y0, side, side));
+    ctx.lineWidth = 3 * s;
+    ctx.strokeRect(x0, y0, side, side);
+    ctx.lineWidth = 1.5 * s;
+    ctx.beginPath();
+    for (let i = 1; i < 10; i++) {
+      const t = (i % 5 === 0 ? 10 : 6) * s;
+      ctx.moveTo(x0 + side * i / 10, y0); ctx.lineTo(x0 + side * i / 10, y0 + t);
+      ctx.moveTo(x0, y0 + side * i / 10); ctx.lineTo(x0 + t, y0 + side * i / 10);
+    }
+    ctx.stroke();
+    const gap = 10 * s, ext = 26 * s;
+    ctx.beginPath();
+    ctx.moveTo(x0 - ext, cy); ctx.lineTo(cx - gap, cy);
+    ctx.moveTo(cx + gap, cy); ctx.lineTo(x0 + side + ext, cy);
+    ctx.moveTo(cx, y0 - ext); ctx.lineTo(cx, cy - gap);
+    ctx.moveTo(cx, cy + gap); ctx.lineTo(cx, y0 + side + ext);
+    ctx.stroke();
+    const ex = x0 - 10 * s, ey = cy - 6 * s;
+    const len = Math.min(110 * s, x0 - 4 * s), a = Math.PI / 6;
+    const sx = ex - len * Math.cos(a), sy = ey - len * Math.sin(a);
+    ctx.lineWidth = 2.5 * s;
+    ctx.setLineDash([7 * s, 5 * s]);
+    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+    ctx.setLineDash([]);
+    const h = 10 * s;
+    ctx.beginPath();
+    ctx.moveTo(ex, ey); ctx.lineTo(ex - h * Math.cos(a - .45), ey - h * Math.sin(a - .45));
+    ctx.moveTo(ex, ey); ctx.lineTo(ex - h * Math.cos(a + .45), ey - h * Math.sin(a + .45));
+    ctx.stroke();
+    label(ctx, '조명 30°', Math.max(sx, 34 * s), sy - 12 * s, s);
+    label(ctx, '정밀 접사 영역 (10cm 이내)', cx, y0 + side + ext + 16 * s, s);
+  }
+
+  if (defect === 'particle') {
+    const { side, cs, x0, y0 } = gridGeom(g);
+    dimOutside(ctx, W, H, c => c.rect(x0, y0, side, side));
+    if (cell) {
+      const col = cell.charCodeAt(0) - 65, row = +cell.slice(1) - 1;
+      ctx.save();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(255,194,51,.28)';
+      ctx.fillRect(x0 + col * cs, y0 + row * cs, cs, cs);
+      ctx.restore();
+      ctx.lineWidth = 4 * s;
+      ctx.strokeRect(x0 + col * cs, y0 + row * cs, cs, cs);
+    }
+    ctx.lineWidth = 1.5 * s;
+    ctx.beginPath();
+    for (let i = 1; i < GRID_N; i++) {
+      ctx.moveTo(x0 + i * cs, y0); ctx.lineTo(x0 + i * cs, y0 + side);
+      ctx.moveTo(x0, y0 + i * cs); ctx.lineTo(x0 + side, y0 + i * cs);
+    }
+    const p = 4 * s;
+    for (let r = 0; r < GRID_N; r++) for (let c = 0; c < GRID_N; c++) {
+      const px = x0 + (c + .5) * cs, py = y0 + (r + .5) * cs;
+      ctx.moveTo(px - p, py); ctx.lineTo(px + p, py);
+      ctx.moveTo(px, py - p); ctx.lineTo(px, py + p);
+    }
+    ctx.stroke();
+    ctx.lineWidth = 3 * s;
+    ctx.strokeRect(x0, y0, side, side);
+    for (let i = 0; i < GRID_N; i++) {
+      label(ctx, String.fromCharCode(65 + i), x0 + (i + .5) * cs, y0 - 12 * s, s);
+      label(ctx, String(i + 1), x0 - 12 * s, y0 + (i + .5) * cs, s);
+    }
+    label(ctx, onScreen ? (cell ? `이물 위치 ${cell} (다시 누르면 해제)` : '이물이 있는 칸을 눌러 위치 표시')
+                        : (cell ? `이물 위치 ${cell}` : ''), cx, y0 + side + 18 * s, s);
+  }
+
+  if (defect === 'coating') {
+    const r = g.m * 0.46;
+    dimOutside(ctx, W, H, c => { c.moveTo(cx + r, cy); c.arc(cx, cy, r, 0, Math.PI * 2); });
+    ctx.lineWidth = 3 * s;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.lineWidth = 1.5 * s;
+    ctx.setLineDash([6 * s, 6 * s]);
+    ctx.beginPath(); ctx.arc(cx, cy, r * 0.55, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.lineWidth = 3 * s;
+    ctx.beginPath();
+    [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => {
+      ctx.moveTo(cx + dx * (r + 4 * s), cy + dy * (r + 4 * s));
+      ctx.lineTo(cx + dx * (r + 16 * s), cy + dy * (r + 16 * s));
+    });
+    ctx.moveTo(cx - 8 * s, cy); ctx.lineTo(cx + 8 * s, cy);
+    ctx.moveTo(cx, cy - 8 * s); ctx.lineTo(cx, cy + 8 * s);
+    ctx.stroke();
+    label(ctx, '중거리 20~30cm, 원 안에 전체 면', cx, cy + r + 30 * s, s);
+  }
+  ctx.restore();
+}
+
+function renderOverlay() {
+  const W = window.innerWidth, H = window.innerHeight, dpr = window.devicePixelRatio || 1;
+  guide.width = Math.round(W * dpr);
+  guide.height = Math.round(H * dpr);
+  gctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  gctx.clearRect(0, 0, W, H);
+  drawGuide(gctx, W, H, 1, insets(), isOverallStep() ? 'overall' : state.defect, state.cell, true);
+}
+function updateTip() {
+  const t = isOverallStep() ? OVERALL_TIP
+    : { tip: DEFECTS[state.defect].tip, sub: DEFECTS[state.defect].sub + CLOSE_EXTRA };
+  $('tipMain').textContent = t.tip;
+  $('tipSub').textContent = t.sub;
+}
+
+/* ================= 촬영 단계 화면 ================= */
+function renderStep() {
+  const n = set.shots.length, active = n > 0;
+  $('st1').className = n === 0 ? 'current' : 'done';
+  $('st2').className = n === 1 ? 'current' : n >= 2 ? 'done' : '';
+  $('st2').textContent = n > 2 ? `2 근접샷 ×${n - 1}` : '2 근접샷';
+  $('capture').textContent = n === 0 ? '📸 1. 전체샷 촬영' : n === 1 ? '📸 2. 근접샷 촬영' : '📸 근접샷 추가 촬영';
+  $('retake').hidden = !active;
+  $('finish').hidden = n < 2;
+  $('model').disabled = $('defect').disabled = $('lot').disabled = active;
+  updateTip();
+  requestAnimationFrame(renderOverlay);
+}
+
+async function retake() {
+  const sh = set.shots.pop();
+  if (!sh) return;
+  shots.splice(shots.indexOf(sh), 1);
+  if (sh.nas === 'sent' || sh.nas === 'sending') set.replace[sh.no] = true;   // NAS의 같은 파일을 덮어씀
+  if (sh.nas && sh.nas !== 'sent') { cancelled.add(sh.id); await Q.del(sh.id); }
+  $('count').textContent = shots.length;
+  if (shots.length) $('thumb').style.backgroundImage = `url(${shots.at(-1).thumb})`;
+  else $('thumb').classList.remove('show');
+  toast(`${sh.no === 1 ? '전체샷' : '근접샷'}을 다시 찍으세요`);
+  renderStep();
+  updateStatus();
+}
+
+function finishSet() {
+  const n = set.shots.length;
+  set.shots = []; set.time = null; set.replace = {};
+  state.cell = null;
+  toast(`세트 완료 (${n}장). 다음 불량의 전체샷을 찍으세요`);
+  renderStep();
+}
+
+/* ================= 카메라 ================= */
+let stream = null, track = null, torchOn = false;
+
+function showMsg(title, html, retry) {
+  $('msg').innerHTML = `<h3>${title}</h3>${html}` + (retry ? '<button id="retry">다시 시도</button>' : '');
+  $('msg').style.display = 'block';
+  if (retry) $('retry').onclick = startCamera;
+}
+
+async function startCamera() {
+  $('msg').style.display = 'none';
+  $('capture').disabled = true;
+  if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showMsg('카메라를 열 수 없습니다',
+      `보안 연결(HTTPS)이 아니어서 브라우저가 카메라를 막았습니다.<br>
+       현재 주소: <code>${location.protocol}//${location.host || '(로컬 파일)'}</code><br>
+       <b>https://</b> 로 시작하는 주소로 열어 주세요. (IT 담당자 문의)`);
+    return;
+  }
+  try {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 3840 }, height: { ideal: 2160 } }
+      });
+    } catch (e) {
+      if (e.name !== 'OverconstrainedError') throw e;
+      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    }
+    video.srcObject = stream;
+    await video.play();
+    track = stream.getVideoTracks()[0];
+    torchOn = false;
+    const caps = track.getCapabilities ? track.getCapabilities() : {};
+    $('torch').classList.toggle('show', !!caps.torch);
+    $('torch').setAttribute('aria-pressed', 'false');
+    $('capture').disabled = false;
+  } catch (e) {
+    const map = {
+      NotAllowedError: ['카메라 권한이 차단됨', '주소창 옆 자물쇠 아이콘(또는 브라우저 설정)에서 카메라를 <b>허용</b>으로 바꾼 뒤 다시 시도하세요.'],
+      NotFoundError: ['카메라 없음', '이 기기에서 사용할 수 있는 카메라를 찾지 못했습니다.'],
+      NotReadableError: ['카메라 사용 중', '다른 앱(카메라, 영상통화 등)이 카메라를 쓰고 있습니다. 그 앱을 닫고 다시 시도하세요.']
+    };
+    const [t, m] = map[e.name] || ['카메라 오류', `카메라를 시작하지 못했습니다. (${e.name})`];
+    showMsg(t, m, true);
+  }
+}
+
+async function toggleTorch() {
+  if (!track) return;
+  try {
+    torchOn = !torchOn;
+    await track.applyConstraints({ advanced: [{ torch: torchOn }] });
+    $('torch').setAttribute('aria-pressed', torchOn);
+  } catch (e) {
+    torchOn = false;
+    toast('이 기기는 플래시 제어를 지원하지 않습니다');
+  }
+}
+
+/* ================= 촬영 → 자동 저장/전송 ================= */
+const shots = [];
+let current = -1, idSeq = 0, previewUrl = null;
+
+// 같은 세트는 세트 시작 시각을 공유: 20261030_샤워헤드A_홀이물_LOT123_142210_1전체.jpg / _2근접.jpg
+const shotType = no => (no === 1 ? '전체' : '근접');
+function fileName(shot) {
+  const lot = shot.lot ? '_' + shot.lot.replace(/[^\w\-가-힣]/g, '') : '';
+  return `${ymd(shot.setTime)}_${MODELS[shot.model].code}_${DEFECTS[shot.defect].code}${lot}_${hms(shot.setTime)}_${shot.no}${shotType(shot.no)}.jpg`;
+}
+
+function stamp(ctx, w, h, s, shot) {
+  const lines = [
+    `${MODELS[shot.model].label}   [${shot.no === 1 ? '전체샷' : '근접샷 ' + (shot.no - 1)}]`,
+    `${DEFECTS[shot.defect].label}${shot.cell ? `  위치 ${shot.cell}` : ''}`,
+    shot.lot ? `LOT ${shot.lot}` : null,
+    `${fmt(shot.time)}${shot.worker ? `  ${shot.worker}` : ''}`
+  ].filter(Boolean);
+  const fs = Math.round(15 * s), lh = fs * 1.45, p = 10 * s;
+  ctx.font = `600 ${fs}px -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif`;
+  const tw = Math.max(...lines.map(l => ctx.measureText(l).width));
+  const bh = lines.length * lh + p * 2, x = 14 * s, y = h - 14 * s - bh;
+  ctx.fillStyle = 'rgba(0,0,0,.62)';
+  ctx.fillRect(x, y, tw + p * 2, bh);
+  ctx.fillStyle = '#fff';
+  ctx.textBaseline = 'middle';
+  lines.forEach((l, i) => ctx.fillText(l, x + p, y + p + lh * (i + .5)));
+}
+
+function downloadBlob(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = Object.assign(document.createElement('a'), { href: url, download: name });
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+async function capture() {
+  const vw = video.videoWidth, vh = video.videoHeight;
+  if (!vw) return;
+  // 1) 화면에 보이는 영역만 즉시 캡처
+  const W = window.innerWidth, H = window.innerHeight;
+  const sc = Math.max(W / vw, H / vh), sw = W / sc, sh = H / sc;
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(sw); cv.height = Math.round(sh);
+  const ctx = cv.getContext('2d');
+  ctx.drawImage(video, (vw - sw) / 2, (vh - sh) / 2, sw, sh, 0, 0, cv.width, cv.height);
+
+  const f = $('flash');
+  f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
+  if (navigator.vibrate) navigator.vibrate(30);
+
+  const ins = insets();
+  const now = new Date();
+  if (!set.time) { set.time = now; set.lot = $('lot').value.trim(); }
+  const no = set.shots.length + 1;
+  const shot = {
+    id: Date.now() * 100 + (idSeq++ % 100), time: now, setTime: set.time, no,
+    model: state.model, defect: state.defect, cell: no === 1 ? null : state.cell,
+    lot: set.lot, worker: settings.worker,
+    nas: wantsNas() ? 'pending' : null, phone: null, ins
+  };
+  shot.name = fileName(shot);
+  const replace = !!set.replace[no];
+  delete set.replace[no];
+  set.shots.push(shot);
+  renderStep();   // 바로 다음 단계 가이드로 전환
+
+  // 2) 정보 표기 / 가이드 합성
+  const s = cv.width / W;
+  if (settings.guide) drawGuide(ctx, cv.width, cv.height, s, shot.ins, no === 1 ? 'overall' : shot.defect, shot.cell, false);
+  if (settings.stamp) stamp(ctx, cv.width, cv.height, s, shot);
+
+  shot.blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.92));
+  const tc = document.createElement('canvas');
+  const ts = 160 / Math.max(cv.width, cv.height);
+  tc.width = cv.width * ts; tc.height = cv.height * ts;
+  tc.getContext('2d').drawImage(cv, 0, 0, tc.width, tc.height);
+  shot.thumb = tc.toDataURL('image/jpeg', .7);
+  cv.width = cv.height = 0;   // 고해상도 캔버스 메모리 해제
+
+  shots.push(shot);
+  $('thumb').style.backgroundImage = `url(${shot.thumb})`;
+  $('thumb').classList.add('show');
+  $('count').textContent = shots.length;
+
+  // 3) NAS 대기열에 넣고 바로 전송
+  if (wantsNas()) {
+    await Q.put({
+      id: shot.id, blob: shot.blob, name: shot.name,
+      meta: {
+        filename: shot.name, taken: fmt(shot.time), worker: shot.worker,
+        model: MODELS[shot.model].code, model_label: MODELS[shot.model].label,
+        defect: DEFECTS[shot.defect].code, defect_label: DEFECTS[shot.defect].label,
+        cell: shot.cell || '', lot: shot.lot,
+        set_id: `${ymd(shot.setTime)}_${hms(shot.setTime)}`, shot_type: shotType(no), shot_no: no,
+        replace: replace ? '1' : ''
+      }
+    });
+    pump();
+  }
+  // 4) 폰 저장 (안드로이드: 자동 / 아이폰: 모아서 한 번에)
+  if (wantsPhone()) {
+    if (IS_IOS) {
+      shot.phone = 'pending';
+      toast('촬영됨. 작업 후 썸네일을 눌러 사진 앱에 한 번에 저장하세요');
+    } else {
+      downloadBlob(shot.blob, shot.name);
+      shot.phone = 'saved';
+      toast(no === 1 ? '전체샷 저장됨. 이제 근접샷을 찍으세요' : `근접샷 저장됨: ${shot.name}`);
+    }
+  } else {
+    toast(no === 1 ? '전체샷 촬영됨. 이제 근접샷을 찍으세요' : '근접샷 촬영됨. 추가로 찍거나 세트 완료를 누르세요');
+  }
+  updateStatus();
+}
+
+function setShotNas(id, st) {
+  const sh = shots.find(x => x.id === id);
+  if (!sh) return;
+  sh.nas = st;
+  if ($('sheet').classList.contains('open')) { renderStrip(); renderShot(); }
+}
+
+/* ================= 사진 시트 ================= */
+const NAS_ICON = { pending: '⏳', sending: '⏳', sent: '✅', fail: '⚠️' };
+const NAS_TEXT = { pending: 'NAS 전송 대기', sending: 'NAS 전송 중', sent: 'NAS 전송 완료', fail: 'NAS 전송 실패, 자동 재시도 예정' };
+const PHONE_TEXT = { pending: '폰 저장 대기', saved: '폰 저장됨' };
+
+function renderStrip() {
+  $('strip').innerHTML = '';
+  shots.forEach((sh, i) => {
+    const b = document.createElement('button');
+    b.style.backgroundImage = `url(${sh.thumb})`;
+    b.setAttribute('aria-label', `사진 ${i + 1}${sh.nas ? ', ' + NAS_TEXT[sh.nas] : ''}`);
+    b.setAttribute('aria-current', i === current);
+    b.innerHTML = `<em>${shotType(sh.no)}</em>` + (sh.nas ? `<i>${NAS_ICON[sh.nas]}</i>` : '');
+    b.onclick = () => { current = i; renderStrip(); renderShot(); };
+    $('strip').appendChild(b);
+  });
+}
+
+function renderShot() {
+  const sh = shots[current];
+  if (!sh) return;
+  if (previewUrl) URL.revokeObjectURL(previewUrl);
+  previewUrl = URL.createObjectURL(sh.blob);
+  $('preview').src = previewUrl;
+  $('fname').textContent = sh.name;
+  $('shotstate').textContent = [sh.nas && NAS_TEXT[sh.nas], sh.phone && PHONE_TEXT[sh.phone]].filter(Boolean).join(', ');
+  const pendingPhone = shots.filter(x => x.phone === 'pending').length;
+  $('savePhone').textContent = IS_IOS && pendingPhone ? `사진 앱에 저장 (${pendingPhone}장)` : '폰에 저장';
+}
+
+function openSheet() {
+  if (!shots.length) return;
+  current = shots.length - 1;
+  renderStrip(); renderShot();
+  $('sheet').classList.add('open');
+}
+function closeSheet() { $('sheet').classList.remove('open'); }
+
+async function savePhone() {
+  const pending = shots.filter(x => x.phone === 'pending');
+  const targets = IS_IOS && pending.length ? pending : [shots[current]];
+  const files = targets.map(sh => new File([sh.blob], sh.name, { type: 'image/jpeg' }));
+  if (IS_IOS && navigator.canShare && navigator.canShare({ files })) {
+    try {
+      await navigator.share({ files });   // 공유 시트에서 '이미지 저장' 선택
+      targets.forEach(sh => sh.phone = 'saved');
+      renderShot();
+      return;
+    } catch (e) { if (e.name === 'AbortError') return; }
+  }
+  targets.forEach(sh => { downloadBlob(sh.blob, sh.name); sh.phone = 'saved'; });
+  renderShot();
+  toast(`${targets.length}장 저장됨`);
+}
+
+async function deleteShot() {
+  const sh = shots[current];
+  if (!sh) return;
+  if (set.shots.includes(sh)) {
+    toast('진행 중인 세트 사진은 촬영 화면의 "다시 찍기"를 사용하세요', 3000);
+    return;
+  }
+  const msg = sh.nas === 'sent'
+    ? '이 사진을 목록에서 지울까요?\n(NAS에 이미 전송된 사진은 NAS에 남아 있습니다)'
+    : '이 사진을 삭제할까요?\n(아직 NAS로 전송되지 않았다면 전송도 취소됩니다)';
+  if (!confirm(msg)) return;
+  if (sh.nas && sh.nas !== 'sent') await Q.del(sh.id);
+  shots.splice(current, 1);
+  $('count').textContent = shots.length;
+  updateStatus();
+  if (!shots.length) { $('thumb').classList.remove('show'); closeSheet(); return; }
+  $('thumb').style.backgroundImage = `url(${shots.at(-1).thumb})`;
+  current = Math.min(current, shots.length - 1);
+  renderStrip(); renderShot();
+}
+
+/* ================= 설정 시트 ================= */
+function fillSettings() {
+  $('sWorker').value = settings.worker;
+  document.querySelectorAll('input[name="mode"]').forEach(r => r.checked = r.value === settings.mode);
+  $('sUrl').value = settings.url;
+  $('sToken').value = settings.token;
+  $('sStamp').checked = settings.stamp;
+  $('sGuide').checked = settings.guide;
+  $('nasBox').hidden = settings.mode === 'phone';
+  $('sTestResult').textContent = ''; $('sTestResult').className = '';
+}
+function readSettings() {
+  settings.worker = $('sWorker').value.trim();
+  settings.mode = document.querySelector('input[name="mode"]:checked')?.value || 'both';
+  settings.url = $('sUrl').value.trim() || 'upload.php';
+  settings.token = $('sToken').value.trim();
+  settings.stamp = $('sStamp').checked;
+  settings.guide = $('sGuide').checked;
+}
+function openSettings(first) {
+  fillSettings();
+  $('firstRun').hidden = !first;
+  $('settings').classList.add('open');
+}
+function closeSettings() {
+  readSettings();
+  if (!settings.worker) { toast('작업자 이름을 입력해 주세요'); $('sWorker').focus(); return; }
+  persist();
+  $('workerChip').textContent = settings.worker;
+  $('settings').classList.remove('open');
+  updateStatus();
+  pump();
+}
+async function testNas() {
+  readSettings();
+  const out = $('sTestResult');
+  out.className = ''; out.textContent = '확인 중...';
+  try {
+    const u = settings.url + (settings.url.includes('?') ? '&' : '?') + 'ping=1&token=' + encodeURIComponent(settings.token);
+    const res = await fetch(u, { cache: 'no-store' });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok) { out.className = 'ok'; out.textContent = '✓ 연결됨. 저장 폴더 쓰기 가능'; }
+    else { out.className = 'bad'; out.textContent = '✕ ' + (data.error || `서버 응답 오류 (${res.status})`); }
+  } catch (e) {
+    out.className = 'bad'; out.textContent = '✕ NAS에 연결할 수 없습니다. 주소와 와이파이를 확인하세요.';
+  }
+}
+
+/* ================= 이벤트 ================= */
+for (const [k, v] of Object.entries(MODELS)) $('model').add(new Option(v.label, k));
+for (const [k, v] of Object.entries(DEFECTS)) $('defect').add(new Option(v.label, k));
+$('model').value = state.model;
+$('defect').value = state.defect;
+
+$('model').onchange = e => { state.model = settings.model = e.target.value; persist(); };
+$('defect').onchange = e => {
+  state.defect = settings.defect = e.target.value; state.cell = null; persist();
+  updateTip(); requestAnimationFrame(renderOverlay);
+};
+$('tip').onclick = () => {
+  const c = $('tip').classList.toggle('collapsed');
+  $('tip').setAttribute('aria-expanded', !c);
+};
+$('stage').addEventListener('click', e => {
+  if (state.defect !== 'particle') return;
+  const { cs, x0, y0 } = gridGeom(geom(window.innerWidth, window.innerHeight, 1, insets()));
+  const col = Math.floor((e.clientX - x0) / cs), row = Math.floor((e.clientY - y0) / cs);
+  if (col < 0 || row < 0 || col >= GRID_N || row >= GRID_N) return;
+  const cell = String.fromCharCode(65 + col) + (row + 1);
+  state.cell = state.cell === cell ? null : cell;
+  renderOverlay();
+});
+$('capture').onclick = capture;
+$('retake').onclick = retake;
+$('finish').onclick = finishSet;
+document.querySelector('.selects').addEventListener('click', () => {
+  if (set.shots.length) toast('세트 진행 중에는 모델/불량 유형을 바꿀 수 없습니다. 세트 완료 후 변경하세요', 3000);
+});
+document.querySelector('.lotrow').addEventListener('click', e => {
+  if (set.shots.length && e.target.id !== 'openSettings' && !e.target.closest('#openSettings'))
+    toast('세트 진행 중에는 LOT를 바꿀 수 없습니다', 2500);
+});
+$('thumb').onclick = openSheet;
+$('torch').onclick = toggleTorch;
+$('close').onclick = closeSheet;
+$('del').onclick = deleteShot;
+$('savePhone').onclick = savePhone;
+$('status').onclick = () => { if (lastError) toast('원인: ' + lastError, 3500); pump(); };
+$('openSettings').onclick = () => openSettings(false);
+$('sDone').onclick = closeSettings;
+$('sTest').onclick = testNas;
+document.querySelectorAll('input[name="mode"]').forEach(r =>
+  r.onchange = () => { $('nasBox').hidden = r.value === 'phone' && r.checked; });
+$('lot').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
+
+new ResizeObserver(() => renderOverlay()).observe($('top'));
+new ResizeObserver(() => renderOverlay()).observe($('controls'));
+window.addEventListener('resize', renderOverlay);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  if (!track || track.readyState === 'ended') startCamera();
+  pump();
+});
+window.addEventListener('beforeunload', e => {
+  if (set.shots.length || shots.some(x => x.phone === 'pending')) { e.preventDefault(); e.returnValue = ''; }
+});
+
+$('workerChip').textContent = settings.worker;
+renderStep();
+renderOverlay();
+updateStatus();
+startCamera();
+pump();   // 이전에 못 보낸 사진이 있으면 자동 전송
+if (!settings.worker) openSettings(true);
+</script>
+</body>
+</html>
