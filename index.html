@@ -54,7 +54,13 @@
   #cam, #guide, #stage { position: fixed; inset: 0; width: 100%; height: 100%; }
   #cam { object-fit: cover; background: #000; }
   #guide { pointer-events: none; }
-  #stage { z-index: 1; }
+  #stage { z-index: 1; touch-action: none; }
+  .focusring {
+    position: fixed; z-index: 2; width: 72px; height: 72px; margin: -36px 0 0 -36px; pointer-events: none;
+    border: 2px solid var(--guide); border-radius: 50%; opacity: 0;
+  }
+  .focusring.go { animation: ring .9s ease-out; }
+  @keyframes ring { 0% { opacity: 1; transform: scale(1.4); } 40% { opacity: 1; transform: scale(1); } 100% { opacity: 0; } }
 
   /* ===== 상단 ===== */
   .top {
@@ -136,6 +142,17 @@
   .torch.show { visibility: visible; }
   .torch[aria-pressed="true"] { background: var(--guide); }
 
+  /* 줌 / 기본 카메라 */
+  .tools { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .zooms { display: flex; gap: 6px; align-items: center; }
+  .zooms button {
+    min-width: 46px; min-height: 42px; border-radius: 21px; cursor: pointer;
+    font: inherit; font-size: 14px; font-weight: 800; color: var(--on-scrim);
+    background: rgba(20,26,32,.7); border: 1.5px solid var(--field-line);
+  }
+  .zooms button[aria-pressed="true"] { background: var(--guide); border-color: var(--guide); color: #1B1A12; }
+  .zooms span { font-size: 13px; font-weight: 700; min-width: 40px; color: var(--guide); }
+
   /* 촬영 단계 표시 */
   .stepbar { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; }
   .steps { display: flex; gap: 6px; margin: 0; padding: 0; list-style: none; flex: 1; }
@@ -211,11 +228,12 @@
 
   /* 설정 시트 */
   .sfield { display: block; margin-bottom: 14px; font-size: 14px; font-weight: 600; color: var(--sheet-sub); }
-  .sfield input {
+  .sfield input, .sfield select {
     display: block; width: 100%; margin-top: 6px; min-height: 48px; padding: 0 12px;
     font: inherit; font-size: 16px; font-weight: 600; color: var(--sheet-text);
     background: var(--sheet-field); border: 1.5px solid var(--sheet-line); border-radius: 10px;
   }
+  .caminfo { margin: -6px 0 14px; font-size: 13px; color: var(--sheet-sub); line-height: 1.5; }
   fieldset { border: 0; padding: 0; margin: 0 0 14px; }
   legend { font-size: 14px; font-weight: 600; color: var(--sheet-sub); margin-bottom: 6px; padding: 0; }
   .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
@@ -257,6 +275,8 @@
 <video id="cam" autoplay playsinline muted></video>
 <canvas id="guide"></canvas>
 <div id="stage" aria-hidden="true"></div>
+<div class="focusring" id="focusring"></div>
+<input type="file" id="nativeInput" accept="image/*" capture="environment" hidden>
 
 <header class="top" id="top">
   <div class="selects">
@@ -273,6 +293,10 @@
 <div id="msg" role="alert"></div>
 
 <footer class="controls" id="controls">
+  <div class="tools">
+    <div class="zooms" id="zooms" aria-label="줌"></div>
+    <button class="mini" id="nativeBtn">📷 기본 카메라로 찍기</button>
+  </div>
   <div class="stepbar">
     <ol class="steps" aria-label="촬영 단계">
       <li id="st1">1 전체샷</li>
@@ -334,7 +358,13 @@
     </div>
   </div>
 
+  <label class="sfield">카메라 렌즈 (사진이 흐리면 다른 렌즈를 골라 보세요)
+    <select id="sLens"><option value="">자동 (기본 후면 카메라)</option></select>
+  </label>
+  <p class="caminfo" id="camInfo"></p>
+
   <div class="opts">
+    <label id="hqRow"><input type="checkbox" id="sHq"> 고화질 촬영 (카메라 사진 해상도로 저장, 촬영에 약 1초)</label>
     <label><input type="checkbox" id="sStamp"> 사진에 정보 표기 (모델, 불량, 작업자, 시간)</label>
     <label><input type="checkbox" id="sGuide"> 사진에 가이드 선 포함</label>
   </div>
@@ -353,7 +383,7 @@ const DEFECTS = {
   scratch: {
     label: '① 미세 스크래치/찍힘', code: '스크래치',
     tip: '💡 스크래치 검사 시: 측면 집게 조명을 30도 사선으로 비춰서 촬영하세요!',
-    sub: '결함을 사각형 중앙에 두고 10cm 이내로 접근하세요. 천장 조명 반사가 사각형 안에 들어오지 않게 각도를 조정합니다.'
+    sub: '바짝 붙이면 초점이 안 맞습니다. 15~20cm 거리에서 2배 줌(또는 두 손가락으로 확대)으로 결함을 사각형 중앙에 두세요. 화면을 누르면 그 지점에 초점을 맞춥니다.'
   },
   particle: {
     label: '② 홀 이물/파티클', code: '홀이물',
@@ -377,7 +407,8 @@ const CLOSE_EXTRA = ' 크기 판정을 위해 소형 자나 스케일 스티커�
 // IT 담당자가 미리 채워 두면 작업자는 이름만 입력하면 됩니다.
 const DEFAULTS = {
   worker: '', mode: 'both', url: 'upload.php', token: '',
-  stamp: true, guide: false, model: 'SHA', defect: 'scratch'
+  stamp: true, guide: false, model: 'SHA', defect: 'scratch',
+  hq: true, lens: ''
 };
 
 /* ================= 공통 ================= */
@@ -616,7 +647,7 @@ function drawGuide(ctx, W, H, s, ins, defect, cell, onScreen) {
     ctx.moveTo(ex, ey); ctx.lineTo(ex - h * Math.cos(a + .45), ey - h * Math.sin(a + .45));
     ctx.stroke();
     label(ctx, '조명 30°', Math.max(sx, 34 * s), sy - 12 * s, s);
-    label(ctx, '정밀 접사 영역 (10cm 이내)', cx, y0 + side + ext + 16 * s, s);
+    label(ctx, '정밀 접사 영역 (15~20cm, 2배 줌)', cx, y0 + side + ext + 16 * s, s);
   }
 
   if (defect === 'particle') {
@@ -731,6 +762,7 @@ function finishSet() {
 
 /* ================= 카메라 ================= */
 let stream = null, track = null, torchOn = false;
+let imageCapture = null, photoCaps = null, camCaps = {}, curZoom = 1;
 
 function showMsg(title, html, retry) {
   $('msg').innerHTML = `<h3>${title}</h3>${html}` + (retry ? '<button id="retry">다시 시도</button>' : '');
@@ -750,22 +782,44 @@ async function startCamera() {
   }
   try {
     if (stream) stream.getTracks().forEach(t => t.stop());
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 3840 }, height: { ideal: 2160 } }
-      });
-    } catch (e) {
-      if (e.name !== 'OverconstrainedError') throw e;
-      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    const size = { width: { ideal: 3840 }, height: { ideal: 2160 } };
+    const tries = [];
+    if (settings.lens) tries.push({ deviceId: { exact: settings.lens }, ...size });
+    tries.push({ facingMode: { ideal: 'environment' }, ...size }, true);
+    let lastErr;
+    stream = null;
+    for (const v of tries) {
+      try { stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: v }); break; }
+      catch (e) {
+        lastErr = e;
+        if (e.name === 'NotAllowedError') throw e;
+        if (v.deviceId) { settings.lens = ''; persist(); }   // 저장된 렌즈를 못 열면 자동으로 복귀
+      }
     }
+    if (!stream) throw lastErr;
     video.srcObject = stream;
     await video.play();
     track = stream.getVideoTracks()[0];
     torchOn = false;
-    const caps = track.getCapabilities ? track.getCapabilities() : {};
-    $('torch').classList.toggle('show', !!caps.torch);
+    camCaps = track.getCapabilities ? track.getCapabilities() : {};
+    $('torch').classList.toggle('show', !!camCaps.torch);
     $('torch').setAttribute('aria-pressed', 'false');
+
+    // 연속 자동 초점
+    if (camCaps.focusMode && camCaps.focusMode.includes('continuous'))
+      track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+
+    // 고해상도 사진 촬영 (안드로이드 크롬)
+    imageCapture = null; photoCaps = null;
+    if ('ImageCapture' in window) {
+      try {
+        imageCapture = new ImageCapture(track);
+        photoCaps = await imageCapture.getPhotoCapabilities();
+      } catch (e) { imageCapture = null; }
+    }
+    setupZoom();
+    populateLenses();
+    updateCamInfo();
     $('capture').disabled = false;
   } catch (e) {
     const map = {
@@ -777,6 +831,134 @@ async function startCamera() {
     showMsg(t, m, true);
   }
 }
+
+/* ----- 줌 ----- */
+let zoomRaf = 0;
+function setupZoom() {
+  const z = camCaps.zoom, box = $('zooms');
+  box.innerHTML = '';
+  if (!z || !(z.max > z.min)) { curZoom = 1; return; }
+  curZoom = (track.getSettings && track.getSettings().zoom) || z.min;
+  const levels = [z.min, 2, 3, 5].filter((v, i, a) => v >= z.min && v <= z.max && a.indexOf(v) === i);
+  levels.forEach(v => {
+    const b = document.createElement('button');
+    b.textContent = (Math.round(v * 10) / 10) + 'x';
+    b.dataset.z = v;
+    b.onclick = () => setZoom(v);
+    box.appendChild(b);
+  });
+  const lab = document.createElement('span');
+  lab.id = 'zoomVal';
+  box.appendChild(lab);
+  markZoom();
+}
+function markZoom() {
+  let hit = false;
+  document.querySelectorAll('#zooms button').forEach(b => {
+    const on = Math.abs(+b.dataset.z - curZoom) < 0.05;
+    hit = hit || on;
+    b.setAttribute('aria-pressed', on);
+  });
+  const lab = $('zoomVal');
+  if (lab) lab.textContent = hit ? '' : (Math.round(curZoom * 10) / 10) + 'x';
+}
+function setZoom(v) {
+  const z = camCaps.zoom;
+  if (!z || !track) return;
+  curZoom = Math.min(z.max, Math.max(z.min, v));
+  markZoom();
+  if (zoomRaf) return;
+  zoomRaf = requestAnimationFrame(() => {
+    zoomRaf = 0;
+    track.applyConstraints({ advanced: [{ zoom: curZoom }] }).catch(() => {});
+  });
+}
+
+/* ----- 화면 터치 초점 ----- */
+function tapFocus(x, y) {
+  const fm = camCaps.focusMode || [];
+  if (!track || !(fm.includes('single-shot') || fm.includes('manual') || fm.includes('continuous'))) return;
+  const W = window.innerWidth, H = window.innerHeight, vw = video.videoWidth, vh = video.videoHeight;
+  if (!vw) return;
+  const sc = Math.max(W / vw, H / vh);
+  const nx = (x - (W - vw * sc) / 2) / (vw * sc), ny = (y - (H - vh * sc) / 2) / (vh * sc);
+  const c = { pointsOfInterest: [{ x: Math.min(1, Math.max(0, nx)), y: Math.min(1, Math.max(0, ny)) }] };
+  if (fm.includes('single-shot')) c.focusMode = 'single-shot';
+  track.applyConstraints({ advanced: [c] }).then(() => {
+    const r = $('focusring');
+    r.style.left = x + 'px'; r.style.top = y + 'px';
+    r.classList.remove('go'); void r.offsetWidth; r.classList.add('go');
+    clearTimeout(tapFocus.t);
+    if (fm.includes('continuous'))
+      tapFocus.t = setTimeout(() => track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {}), 4000);
+  }).catch(() => {});
+}
+
+/* ----- 렌즈 목록 ----- */
+async function populateLenses() {
+  try {
+    const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+    let back = devs.filter(d => /back|rear|environment|후면/i.test(d.label));
+    if (!back.length) back = devs;
+    const sel = $('sLens');
+    sel.innerHTML = '<option value="">자동 (기본 후면 카메라)</option>';
+    back.forEach((d, i) => sel.add(new Option(`후면 카메라 ${i + 1}${d.label ? ' (' + d.label + ')' : ''}`, d.deviceId)));
+    sel.value = settings.lens;
+    $('sLens').closest('label').hidden = back.length < 2;
+  } catch (e) {}
+}
+function updateCamInfo() {
+  const vw = video.videoWidth, vh = video.videoHeight;
+  const ph = photoCaps && photoCaps.imageWidth && photoCaps.imageWidth.max
+    ? `사진 최대 ${photoCaps.imageWidth.max}×${photoCaps.imageHeight.max}` : '고화질 사진 촬영 미지원 (영상 캡처로 저장)';
+  $('camInfo').textContent = vw ? `현재 카메라: 미리보기 ${vw}×${vh}, ${ph}` : '';
+  $('hqRow').hidden = !imageCapture;
+}
+
+/* ----- 사진 얻기 ----- */
+// 미리보기 영상에서 화면에 보이는 영역만 캡처 (빠름, 해상도 낮음)
+function grabFrame(W, H) {
+  const vw = video.videoWidth, vh = video.videoHeight;
+  const sc = Math.max(W / vw, H / vh), sw = W / sc, sh = H / sc;
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(sw); cv.height = Math.round(sh);
+  cv.getContext('2d').drawImage(video, (vw - sw) / 2, (vh - sh) / 2, sw, sh, 0, 0, cv.width, cv.height);
+  return cv;
+}
+// 카메라 사진 해상도로 촬영 후 화면과 같은 범위로 자르기 (안드로이드 크롬)
+async function grabPhoto(W, H) {
+  const opts = {};
+  if (photoCaps && photoCaps.imageWidth && photoCaps.imageWidth.max) {
+    opts.imageWidth = photoCaps.imageWidth.max;
+    opts.imageHeight = photoCaps.imageHeight.max;
+  }
+  let blob;
+  try { blob = await imageCapture.takePhoto(opts); }
+  catch (e) { blob = await imageCapture.takePhoto(); }
+  const bmp = await createImageBitmap(blob, { imageOrientation: 'from-image' });
+  const vw = video.videoWidth, vh = video.videoHeight;
+  const rotate = (bmp.width > bmp.height) !== (vw > vh) && Math.abs(bmp.width - bmp.height) > 10;
+  const ow = rotate ? bmp.height : bmp.width, oh = rotate ? bmp.width : bmp.height;
+  // 미리보기 영상은 센서 중앙을 잘라 쓰므로, 사진에서 같은 범위를 찾음
+  const va = vw / vh;
+  let fw, fh;
+  if (ow / oh > va) { fh = oh; fw = oh * va; } else { fw = ow; fh = ow / va; }
+  const sc = Math.max(W / fw, H / fh), sw = W / sc, sh = H / sc;
+  const sx = (ow - sw) / 2, sy = (oh - sh) / 2;
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(sw); cv.height = Math.round(sh);
+  const ctx = cv.getContext('2d');
+  if (!rotate) ctx.drawImage(bmp, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
+  else {
+    ctx.translate(-sx, -sy);
+    ctx.translate(ow, 0);
+    ctx.rotate(Math.PI / 2);
+    ctx.drawImage(bmp, 0, 0);
+  }
+  bmp.close();
+  return cv;
+}
+const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
 
 async function toggleTorch() {
   if (!track) return;
@@ -826,22 +1008,60 @@ function downloadBlob(blob, name) {
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
-async function capture() {
-  const vw = video.videoWidth, vh = video.videoHeight;
-  if (!vw) return;
-  // 1) 화면에 보이는 영역만 즉시 캡처
-  const W = window.innerWidth, H = window.innerHeight;
-  const sc = Math.max(W / vw, H / vh), sw = W / sc, sh = H / sc;
-  const cv = document.createElement('canvas');
-  cv.width = Math.round(sw); cv.height = Math.round(sh);
-  const ctx = cv.getContext('2d');
-  ctx.drawImage(video, (vw - sw) / 2, (vh - sh) / 2, sw, sh, 0, 0, cv.width, cv.height);
-
+let busy = false;
+function doFlash() {
   const f = $('flash');
   f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
   if (navigator.vibrate) navigator.vibrate(30);
+}
 
-  const ins = insets();
+async function capture() {
+  if (busy || !video.videoWidth) return;
+  busy = true;
+  const btn = $('capture');
+  btn.disabled = true;
+  const W = window.innerWidth, H = window.innerHeight, ins = insets();
+  try {
+    let cv = null;
+    // 카메라 사진 해상도가 미리보기보다 클 때만 고화질 촬영 사용
+    const pc = photoCaps && photoCaps.imageWidth;
+    const hqBetter = !pc || !pc.max || pc.max * photoCaps.imageHeight.max > video.videoWidth * video.videoHeight * 1.1;
+    if (settings.hq && imageCapture && hqBetter) {
+      btn.textContent = '촬영 중... 움직이지 마세요';
+      try { cv = await withTimeout(grabPhoto(W, H), 5000); }
+      catch (e) { cv = null; }
+      video.play().catch(() => {});
+    }
+    if (!cv) cv = grabFrame(W, H);
+    doFlash();
+    await finalizeShot(cv, cv.width / W, ins, false);
+  } finally {
+    busy = false;
+    btn.disabled = false;
+    renderStep();
+  }
+}
+
+// 폰 기본 카메라 앱으로 찍은 사진 (최고 화질, 오버레이 없음)
+async function nativeShot(file) {
+  if (!file) return;
+  try {
+    const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const k = Math.min(1, 6000 / Math.max(bmp.width, bmp.height));
+    const cv = document.createElement('canvas');
+    cv.width = Math.round(bmp.width * k); cv.height = Math.round(bmp.height * k);
+    cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+    bmp.close();
+    doFlash();
+    await finalizeShot(cv, Math.max(cv.width, cv.height) / Math.max(window.innerWidth, window.innerHeight), insets(), true);
+    renderStep();
+  } catch (e) {
+    toast('사진을 불러오지 못했습니다. 다시 시도해 주세요');
+  }
+}
+
+async function finalizeShot(cv, s, ins, native) {
+  const ctx = cv.getContext('2d');
   const now = new Date();
   if (!set.time) { set.time = now; set.lot = $('lot').value.trim(); }
   const no = set.shots.length + 1;
@@ -858,8 +1078,7 @@ async function capture() {
   renderStep();   // 바로 다음 단계 가이드로 전환
 
   // 2) 정보 표기 / 가이드 합성
-  const s = cv.width / W;
-  if (settings.guide) drawGuide(ctx, cv.width, cv.height, s, shot.ins, no === 1 ? 'overall' : shot.defect, shot.cell, false);
+  if (settings.guide && !native) drawGuide(ctx, cv.width, cv.height, s, shot.ins, no === 1 ? 'overall' : shot.defect, shot.cell, false);
   if (settings.stamp) stamp(ctx, cv.width, cv.height, s, shot);
 
   shot.blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.92));
@@ -997,6 +1216,9 @@ function fillSettings() {
   $('sToken').value = settings.token;
   $('sStamp').checked = settings.stamp;
   $('sGuide').checked = settings.guide;
+  $('sHq').checked = settings.hq;
+  $('sLens').value = settings.lens;
+  updateCamInfo();
   $('nasBox').hidden = settings.mode === 'phone';
   $('sTestResult').textContent = ''; $('sTestResult').className = '';
 }
@@ -1007,6 +1229,8 @@ function readSettings() {
   settings.token = $('sToken').value.trim();
   settings.stamp = $('sStamp').checked;
   settings.guide = $('sGuide').checked;
+  settings.hq = $('sHq').checked;
+  settings.lens = $('sLens').value;
 }
 function openSettings(first) {
   fillSettings();
@@ -1014,6 +1238,7 @@ function openSettings(first) {
   $('settings').classList.add('open');
 }
 function closeSettings() {
+  const prevLens = settings.lens;
   readSettings();
   if (!settings.worker) { toast('작업자 이름을 입력해 주세요'); $('sWorker').focus(); return; }
   persist();
@@ -1021,6 +1246,7 @@ function closeSettings() {
   $('settings').classList.remove('open');
   updateStatus();
   pump();
+  if (settings.lens !== prevLens) startCamera();
 }
 async function testNas() {
   readSettings();
@@ -1052,8 +1278,26 @@ $('tip').onclick = () => {
   const c = $('tip').classList.toggle('collapsed');
   $('tip').setAttribute('aria-expanded', !c);
 };
+const pts = new Map();
+let pinch = null, pinchedAt = 0;
+const pdist = () => { const [a, b] = [...pts.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+$('stage').addEventListener('pointerdown', e => {
+  pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pts.size === 2 && camCaps.zoom) pinch = { d: pdist(), z: curZoom };
+});
+$('stage').addEventListener('pointermove', e => {
+  if (!pts.has(e.pointerId)) return;
+  pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pinch && pts.size === 2) { setZoom(pinch.z * pdist() / pinch.d); pinchedAt = Date.now(); }
+});
+['pointerup', 'pointercancel'].forEach(t => $('stage').addEventListener(t, e => {
+  pts.delete(e.pointerId);
+  if (pts.size < 2) pinch = null;
+}));
 $('stage').addEventListener('click', e => {
-  if (state.defect !== 'particle') return;
+  if (Date.now() - pinchedAt < 500) return;
+  tapFocus(e.clientX, e.clientY);
+  if (state.defect !== 'particle' || isOverallStep()) return;
   const { cs, x0, y0 } = gridGeom(geom(window.innerWidth, window.innerHeight, 1, insets()));
   const col = Math.floor((e.clientX - x0) / cs), row = Math.floor((e.clientY - y0) / cs);
   if (col < 0 || row < 0 || col >= GRID_N || row >= GRID_N) return;
@@ -1062,6 +1306,8 @@ $('stage').addEventListener('click', e => {
   renderOverlay();
 });
 $('capture').onclick = capture;
+$('nativeBtn').onclick = () => { $('nativeInput').value = ''; $('nativeInput').click(); };
+$('nativeInput').onchange = e => nativeShot(e.target.files[0]);
 $('retake').onclick = retake;
 $('finish').onclick = finishSet;
 document.querySelector('.selects').addEventListener('click', () => {
